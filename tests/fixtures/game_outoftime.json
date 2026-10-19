@@ -1,0 +1,28 @@
+{
+  "id": "4MhVOLfl",
+  "rated": true,
+  "variant": "standard",
+  "speed": "blitz",
+  "perf": "blitz",
+  "createdAt": 1792244944436,
+  "lastMoveAt": 1792245351993,
+  "status": "outoftime",
+  "source": "pool",
+  "players": {
+    "white": {"user": {"name": "a_jakov95", "id": "a_jakov95"}, "rating": 1636, "ratingDiff": 5},
+    "black": {"user": {"name": "blazene", "id": "blazene"}, "rating": 1611, "ratingDiff": -14}
+  },
+  "winner": "white",
+  "opening": {"eco": "B20", "name": "Sicilian Defense: Staunton-Cochrane Variation", "ply": 3},
+  "moves": "e4 c5 c4 Nc6 Nf3 d6 d3 Nf6 Nc3 a6 Be2 e6 O-O Be7 h3 O-O Bd2 b6 a3 Bb7 Rb1 Rc8 b4 cxb4 axb4 Qc7 Be3 h6 Na4 b5 cxb5 axb5 Bb6 Qb8 Nc3 Nxb4 Nxb5 Bc6 Ba5 Qxb5 Bxb4 Qb8 Nd4 Bd7 Qd2 e5 Nf3 Be6 Qe3 Qb5 d4 Qd7 d5 Bxd5 exd5 Nxd5 Qe4 Nxb4 Rxb4 f6 Bd3 Rf7 Qh7+",
+  "clocks": [
+    18003, 18003, 18075, 18059, 18275, 17899, 18379, 17947, 18539, 17979,
+    18651, 17707, 18627, 17819, 18691, 17955, 18539, 18051, 18547, 18171,
+    18675, 18275, 18819, 18323, 19019, 17843, 18339, 17747, 17691, 16355,
+    17595, 15235, 17587, 14859, 17427, 13811, 12267, 11587, 11187, 10915,
+    11219, 6691, 10987, 5235, 10395, 4475, 9811, 4283, 8427, 3787,
+    8235, 3211, 7907, 3003, 7835, 3163, 7307, 2643, 7035, 1907,
+    6987, 1792, 6770, 0
+  ],
+  "clock": {"initial": 180, "increment": 2, "totalTime": 260}
+}
