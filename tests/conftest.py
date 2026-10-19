@@ -41,7 +41,16 @@ def test_db_ready():
 
 @pytest.fixture
 def db(test_db_ready):
-    """A connection whose work is rolled back after every test."""
-    with psycopg.connect(TEST_DATABASE_URL) as conn:
+    """A connection that sits inside one outer transaction, which is always rolled back.
+
+    Code under test that opens its own transaction block (like store_game) then becomes
+    a savepoint inside this one, so nothing it does can be committed.
+    """
+    with psycopg.connect(TEST_DATABASE_URL) as conn, conn.transaction(force_rollback=True):
+        leftover = conn.execute("SELECT count(*) FROM games").fetchone()[0]
+        if leftover:
+            raise RuntimeError(
+                "Test database is not clean: an earlier test committed data. "
+                "Something is bypassing the rollback."
+            )
         yield conn
-        conn.rollback()
