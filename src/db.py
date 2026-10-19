@@ -1,5 +1,7 @@
 """Database access. Together with migrate.py, the only place that runs SQL."""
 
+from datetime import datetime
+
 import psycopg
 from psycopg.types.json import Jsonb
 
@@ -29,7 +31,8 @@ INSERT_MOVE_SQL = (
 
 
 def connect(database_url: str) -> psycopg.Connection:
-    return psycopg.connect(database_url)
+    """Autocommit connection: each store_game call is then its own real transaction."""
+    return psycopg.connect(database_url, autocommit=True)
 
 
 def insert_game(conn: psycopg.Connection, game: Game) -> int | None:
@@ -85,3 +88,33 @@ def store_game(conn: psycopg.Connection, game: Game) -> bool:
             raise ValueError(f"Game {game.lichess_id}: {exc}") from exc
         insert_moves(conn, game_id, rows)
     return True
+
+
+def newest_played_at(conn: psycopg.Connection) -> datetime | None:
+    """When the newest stored game started, or None if no games are stored."""
+    return conn.execute("SELECT max(played_at) FROM games").fetchone()[0]
+
+
+def full_sync_done(conn: psycopg.Connection, username: str) -> bool:
+    """Has the complete history of this user been loaded at least once?"""
+    row = conn.execute(
+        "SELECT 1 FROM sync_state WHERE lichess_username = %s", (username.lower(),)
+    ).fetchone()
+    return row is not None
+
+
+def mark_full_sync(conn: psycopg.Connection, username: str) -> None:
+    """Record that the complete history of this user has been loaded."""
+    conn.execute(
+        "INSERT INTO sync_state (lichess_username) VALUES (%s) "
+        "ON CONFLICT (lichess_username) DO UPDATE SET full_sync_completed_at = now()",
+        (username.lower(),),
+    )
+
+
+def table_counts(conn: psycopg.Connection) -> tuple[int, int]:
+    """(number of games, number of moves) currently stored."""
+    row = conn.execute(
+        "SELECT (SELECT count(*) FROM games), (SELECT count(*) FROM moves)"
+    ).fetchone()
+    return row[0], row[1]
