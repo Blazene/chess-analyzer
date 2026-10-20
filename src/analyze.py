@@ -12,7 +12,7 @@ import chess.engine
 from engine import DEFAULT_DEPTH, Evaluation, evaluate, open_engine
 from loss import move_losses, summarize
 
-# Used ONLY to draw curves and preview swings. Day 10 decides the real treatment of mates.
+# Used ONLY to draw curves. The real treatment of mates is in loss.py.
 MATE_DISPLAY_CP = 1000
 BAR_SCALE_CP = 500
 BAR_HALF_WIDTH = 10
@@ -67,23 +67,6 @@ def display_cp(evaluation: Evaluation) -> int:
     if evaluation.mate is not None:
         return MATE_DISPLAY_CP if evaluation.mate > 0 else -MATE_DISPLAY_CP
     return evaluation.cp
-
-
-def biggest_swings(results: Sequence[PlyEval], top: int = 3) -> list[tuple[int, int]]:
-    """The moves that hurt the player who made them most: [(ply, centipawns lost), ...].
-
-    Preview only. Day 10 turns this into the real centipawn-loss column.
-    """
-    swings = []
-    for before, after in zip(results, results[1:], strict=False):
-        if before.evaluation is None or after.evaluation is None:
-            continue
-        was, now = display_cp(before.evaluation), display_cp(after.evaluation)
-        white_moved = after.ply % 2 == 1
-        loss = (was - now) if white_moved else (now - was)
-        if loss > 0:
-            swings.append((after.ply, loss))
-    return sorted(swings, key=lambda swing: swing[1], reverse=True)[:top]
 
 
 def move_label(ply: int, san: str | None) -> str:

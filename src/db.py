@@ -1,10 +1,13 @@
 """Database access. Together with migrate.py, the only place that runs SQL."""
 
+from collections.abc import Sequence
 from datetime import datetime
 
 import psycopg
 from psycopg.types.json import Jsonb
 
+from analyze import PlyEval
+from loss import MoveLoss
 from models import Game
 from replay import MoveRow, replay_moves
 
@@ -133,3 +136,85 @@ def get_game(conn: psycopg.Connection, lichess_id: str | None = None) -> dict | 
         sql = f"SELECT {columns} FROM games WHERE lichess_id = %s"
         row = conn.execute(sql, (lichess_id,)).fetchone()
     return None if row is None else dict(zip(GAME_COLUMNS, row, strict=True))
+
+
+GET_OR_CREATE_RUN_SQL = """
+INSERT INTO analysis_runs (engine_name, depth) VALUES (%s, %s)
+ON CONFLICT (engine_name, depth) DO UPDATE SET engine_name = EXCLUDED.engine_name
+RETURNING id
+"""
+
+INSERT_EVALUATION_SQL = (
+    "INSERT INTO evaluations "
+    "(analysis_run_id, game_id, ply, stockfish_cp, stockfish_mate, best_move) "
+    "VALUES (%s, %s, %s, %s, %s, %s)"
+)
+
+INSERT_MOVE_LOSS_SQL = (
+    "INSERT INTO move_losses (analysis_run_id, game_id, ply, loss_cp, label) "
+    "VALUES (%s, %s, %s, %s, %s)"
+)
+
+# A game is analyzed for a run once ANY evaluation row exists for it. That is safe because
+# store_analysis writes all of a game's rows in one transaction.
+UNANALYZED_SQL = """
+FROM games g
+WHERE NOT EXISTS (
+    SELECT 1 FROM evaluations e WHERE e.analysis_run_id = %s AND e.game_id = g.id
+)
+"""
+
+
+def get_or_create_run(conn: psycopg.Connection, engine_name: str, depth: int) -> int:
+    """The id of the analysis run for these settings, created on first use.
+
+    The no-op DO UPDATE is there so RETURNING also works when the row already exists.
+    """
+    return conn.execute(GET_OR_CREATE_RUN_SQL, (engine_name, depth)).fetchone()[0]
+
+
+def games_to_analyze(conn: psycopg.Connection, run_id: int, limit: int | None = None) -> list[dict]:
+    """Games with no evaluations under this run, newest first."""
+    sql = "SELECT g.id, g.lichess_id, g.moves_san " + UNANALYZED_SQL
+    sql += " ORDER BY g.played_at DESC, g.id DESC"
+    params: list = [run_id]
+    if limit is not None:
+        sql += " LIMIT %s"
+        params.append(limit)
+    rows = conn.execute(sql, params).fetchall()
+    return [{"id": r[0], "lichess_id": r[1], "moves_san": r[2]} for r in rows]
+
+
+def remaining_work(conn: psycopg.Connection, run_id: int) -> tuple[int, int]:
+    """(games not yet analyzed under this run, total moves in those games)."""
+    sql = (
+        "SELECT count(*), coalesce(sum(n), 0) FROM ("
+        "SELECT (SELECT count(*) FROM moves m WHERE m.game_id = g.id) AS n "
+        + UNANALYZED_SQL
+        + ") t"
+    )
+    row = conn.execute(sql, (run_id,)).fetchone()
+    return row[0], int(row[1])
+
+
+def store_analysis(
+    conn: psycopg.Connection,
+    run_id: int,
+    game_id: int,
+    results: Sequence[PlyEval],
+    losses: Sequence[MoveLoss],
+) -> None:
+    """Save one game's evaluations and move losses in ONE transaction.
+
+    Positions with no evaluation (a finished game) get no evaluations row.
+    Storing the same game twice for one run is an error, not a silent overwrite.
+    """
+    evaluation_rows = [
+        (run_id, game_id, r.ply, r.evaluation.cp, r.evaluation.mate, r.evaluation.best_move)
+        for r in results
+        if r.evaluation is not None
+    ]
+    loss_rows = [(run_id, game_id, m.ply, m.loss_cp, m.label) for m in losses]
+    with conn.transaction(), conn.cursor() as cur:
+        cur.executemany(INSERT_EVALUATION_SQL, evaluation_rows)
+        cur.executemany(INSERT_MOVE_LOSS_SQL, loss_rows)

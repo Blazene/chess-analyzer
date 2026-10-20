@@ -8,7 +8,6 @@ from db_helpers import insert_game
 from analyze import (
     PlyEval,
     bar,
-    biggest_swings,
     display_cp,
     evaluate_game,
     move_label,
@@ -112,29 +111,6 @@ def test_empty_game_has_only_the_start_position():
 )
 def test_display_cp(evaluation, expected):
     assert display_cp(evaluation) == expected
-
-
-def test_biggest_swings_are_measured_against_the_player_who_moved():
-    results = [
-        ply_eval(0, ev(20)),
-        ply_eval(1, ev(30)),
-        ply_eval(2, ev(400)),
-        ply_eval(3, ev(-100)),
-    ]
-
-    assert biggest_swings(results, top=2) == [(3, 500), (2, 370)]
-
-
-def test_moves_that_improved_the_position_are_not_listed():
-    results = [ply_eval(0, ev(20)), ply_eval(1, ev(30))]
-
-    assert biggest_swings(results) == []
-
-
-def test_positions_without_an_evaluation_are_skipped():
-    results = [ply_eval(0, ev(0)), ply_eval(1, ev(-300)), ply_eval(2, None)]
-
-    assert biggest_swings(results) == [(1, 300)]
 
 
 @pytest.mark.parametrize(
