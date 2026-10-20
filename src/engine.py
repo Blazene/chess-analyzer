@@ -49,12 +49,20 @@ def open_engine(
 
 
 def evaluate(
-    engine: chess.engine.SimpleEngine, board: chess.Board, depth: int = DEFAULT_DEPTH
+    engine: chess.engine.SimpleEngine,
+    board: chess.Board,
+    depth: int = DEFAULT_DEPTH,
+    game: object | None = None,
 ) -> Evaluation:
-    """Evaluate the position on the board, searching to a fixed depth."""
+    """Evaluate the position on the board, searching to a fixed depth.
+
+    `game` identifies which game the position belongs to. When it changes, python-chess
+    tells Stockfish to start fresh (ucinewgame), so one game's search memory never
+    leaks into the next game's results.
+    """
     if board.is_game_over():
         raise ValueError("position is game over: nothing to evaluate")
-    info = engine.analyse(board, chess.engine.Limit(depth=depth))
+    info = engine.analyse(board, chess.engine.Limit(depth=depth), game=game)
     cp, mate = normalize_score(info["score"])
     pv = info.get("pv")
     return Evaluation(cp, mate, pv[0].uci() if pv else None)

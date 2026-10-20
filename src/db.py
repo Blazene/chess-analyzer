@@ -118,3 +118,18 @@ def table_counts(conn: psycopg.Connection) -> tuple[int, int]:
         "SELECT (SELECT count(*) FROM games), (SELECT count(*) FROM moves)"
     ).fetchone()
     return row[0], row[1]
+
+
+GAME_COLUMNS = ("lichess_id", "color", "result", "status", "opponent_name", "moves_san")
+
+
+def get_game(conn: psycopg.Connection, lichess_id: str | None = None) -> dict | None:
+    """One stored game as a dict (your newest game if no id is given), or None."""
+    columns = ", ".join(GAME_COLUMNS)
+    if lichess_id is None:
+        sql = f"SELECT {columns} FROM games ORDER BY played_at DESC LIMIT 1"
+        row = conn.execute(sql).fetchone()
+    else:
+        sql = f"SELECT {columns} FROM games WHERE lichess_id = %s"
+        row = conn.execute(sql, (lichess_id,)).fetchone()
+    return None if row is None else dict(zip(GAME_COLUMNS, row, strict=True))
