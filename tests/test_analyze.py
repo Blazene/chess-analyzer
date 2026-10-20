@@ -224,3 +224,9 @@ def test_get_game_unknown_id_returns_none(db):
 
 def test_get_game_on_an_empty_database_returns_none(db):
     assert get_game(db) is None
+
+
+def test_checkmate_position_is_flagged_and_others_are_not():
+    results = evaluate_game(FakeEngine(), FOOLS_MATE_MOVES, depth=5)
+
+    assert [r.checkmate for r in results] == [False, False, False, False, True]

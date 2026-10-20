@@ -10,6 +10,7 @@ import chess
 import chess.engine
 
 from engine import DEFAULT_DEPTH, Evaluation, evaluate, open_engine
+from loss import move_losses, summarize
 
 # Used ONLY to draw curves and preview swings. Day 10 decides the real treatment of mates.
 MATE_DISPLAY_CP = 1000
@@ -23,6 +24,7 @@ class PlyEval:
     san: str | None  # the move that led to this position (None at ply 0)
     evaluation: Evaluation | None  # None when the game is already over in this position
     seconds: float
+    checkmate: bool = False  # the game ended here by checkmate
 
 
 def evaluate_game(
@@ -51,7 +53,7 @@ def evaluate_game(
         evaluation = None
         if not board.is_game_over():
             evaluation = evaluate(engine, board, depth, game=game_key)
-        result = PlyEval(ply, san, evaluation, time.perf_counter() - started)
+        result = PlyEval(ply, san, evaluation, time.perf_counter() - started, board.is_checkmate())
 
         results.append(result)
         if on_ply:
@@ -117,14 +119,27 @@ def print_curve(results: Sequence[PlyEval]) -> None:
 
 
 def print_swings(results: Sequence[PlyEval]) -> None:
-    swings = biggest_swings(results)
-    if not swings:
+    losses = move_losses(results)
+    print("\nLoss per move, from the mover's point of view (mates capped at 1000):")
+    for mover in ("white", "black"):
+        average, counts = summarize(losses, mover)
+        if average is None:
+            continue
+        print(
+            f"  {mover:<5} average {average:.0f} cp | {counts['inaccuracy']} inaccuracies, "
+            f"{counts['mistake']} mistakes, {counts['blunder']} blunders"
+        )
+    worst = sorted(losses, key=lambda m: m.loss_cp, reverse=True)[:5]
+    worst = [m for m in worst if m.loss_cp > 0]
+    if not worst:
         print("\nNo move made the position worse.")
         return
-    print("\nBiggest drops, from the point of view of the player who moved (mates count as 1000):")
-    for ply, loss in swings:
-        who = "White" if ply % 2 == 1 else "Black"
-        print(f"  ply {ply:>3}  {move_label(ply, results[ply].san):<12} {who} lost {loss} cp")
+    print("\nWorst moves:")
+    for m in worst:
+        print(
+            f"  ply {m.ply:>3}  {move_label(m.ply, m.san):<12} {m.mover:<5} "
+            f"lost {m.loss_cp:>4} cp ({m.win_drop:4.1f} win points)  {m.label}"
+        )
 
 
 def print_timing(results: Sequence[PlyEval], games_total: int, moves_total: int) -> None:
