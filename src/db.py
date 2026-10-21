@@ -218,3 +218,12 @@ def store_analysis(
     with conn.transaction(), conn.cursor() as cur:
         cur.executemany(INSERT_EVALUATION_SQL, evaluation_rows)
         cur.executemany(INSERT_MOVE_LOSS_SQL, loss_rows)
+
+
+def recent_games(conn: psycopg.Connection, limit: int) -> list[dict]:
+    """The newest stored games, analyzed or not. Used for timing experiments."""
+    rows = conn.execute(
+        "SELECT id, lichess_id, moves_san FROM games ORDER BY played_at DESC, id DESC LIMIT %s",
+        (limit,),
+    ).fetchall()
+    return [{"id": r[0], "lichess_id": r[1], "moves_san": r[2]} for r in rows]

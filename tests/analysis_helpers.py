@@ -1,5 +1,8 @@
 """Helpers for the analysis tests: tiny games written with plain SQL, and a fake engine."""
 
+import os
+import shutil
+
 import chess
 from chess.engine import Cp, PovScore
 
@@ -41,3 +44,18 @@ class FakeEngine:
     def analyse(self, board, limit, game=None):
         self.calls.append({"history": len(board.move_stack), "game": game, "depth": limit.depth})
         return {"score": PovScore(Cp(25), board.turn), "pv": [next(iter(board.legal_moves))]}
+
+
+STOCKFISH_LOCATIONS = (
+    "/opt/homebrew/bin/stockfish",
+    "/usr/local/bin/stockfish",
+    "/usr/games/stockfish",
+)
+
+
+def find_stockfish() -> str | None:
+    """Where Stockfish is installed on this machine, or None (the tests then skip)."""
+    found = shutil.which("stockfish")
+    if found:
+        return found
+    return next((path for path in STOCKFISH_LOCATIONS if os.path.exists(path)), None)
