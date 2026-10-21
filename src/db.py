@@ -227,3 +227,52 @@ def recent_games(conn: psycopg.Connection, limit: int) -> list[dict]:
         (limit,),
     ).fetchall()
     return [{"id": r[0], "lichess_id": r[1], "moves_san": r[2]} for r in rows]
+
+
+INTEGRITY_SQL = """
+SELECT g.lichess_id,
+       (SELECT count(*) FROM moves m WHERE m.game_id = g.id),
+       (SELECT count(*) FROM evaluations e
+         WHERE e.analysis_run_id = %s AND e.game_id = g.id),
+       (SELECT count(*) FROM move_losses l
+         WHERE l.analysis_run_id = %s AND l.game_id = g.id)
+FROM games g
+ORDER BY g.id
+"""
+
+
+def integrity_rows(conn: psycopg.Connection, run_id: int) -> list[tuple]:
+    """(lichess_id, moves, evaluations, move_losses) for every stored game."""
+    return conn.execute(INTEGRITY_SQL, (run_id, run_id)).fetchall()
+
+
+def comparison_data(conn: psycopg.Connection, run_id: int) -> list[dict]:
+    """Games that carry Lichess's own analysis, with our evaluations and labels for them."""
+    games = conn.execute(
+        "SELECT id, lichess_id, lichess_analysis FROM games "
+        "WHERE lichess_analysis IS NOT NULL ORDER BY id"
+    ).fetchall()
+    ids = [g[0] for g in games]
+    cps: dict[int, dict] = {i: {} for i in ids}
+    labels: dict[int, dict] = {i: {} for i in ids}
+
+    evaluations = conn.execute(
+        "SELECT game_id, ply, stockfish_cp, stockfish_mate FROM evaluations "
+        "WHERE analysis_run_id = %s AND game_id = ANY(%s)",
+        (run_id, ids),
+    )
+    for game_id, ply, cp, mate in evaluations:
+        cps[game_id][ply] = (cp, mate)
+
+    move_losses = conn.execute(
+        "SELECT game_id, ply, label FROM move_losses "
+        "WHERE analysis_run_id = %s AND game_id = ANY(%s)",
+        (run_id, ids),
+    )
+    for game_id, ply, label in move_losses:
+        labels[game_id][ply] = label
+
+    return [
+        {"lichess_id": g[1], "analysis": g[2], "cps": cps[g[0]], "labels": labels[g[0]]}
+        for g in games
+    ]
