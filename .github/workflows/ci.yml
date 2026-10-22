@@ -64,3 +64,28 @@ jobs:
             echo "Some tests were skipped. Is Stockfish installed?"
             exit 1
           fi
+
+  docker:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build the dashboard image
+        run: docker build -t chess-analyzer .
+
+      - name: The image has no Stockfish and does not run as root
+        run: |
+          docker run --rm --entrypoint sh chess-analyzer -c '! which stockfish'
+          docker run --rm --entrypoint id chess-analyzer -u | grep -qx 1000
+
+      - name: The dashboard server starts and reports healthy
+        run: |
+          docker run -d --name dash -p 8501:8501 chess-analyzer
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:8501/_stcore/health; then exit 0; fi
+            sleep 2
+          done
+          docker logs dash
+          exit 1
