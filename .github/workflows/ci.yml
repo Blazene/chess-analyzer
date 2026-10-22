@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: analyzer
+          POSTGRES_PASSWORD: analyzer
+          POSTGRES_DB: chess_analyzer_test
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U analyzer -d chess_analyzer_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v8.2.0
+        with:
+          enable-cache: true
+
+      - name: Install Stockfish
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y stockfish
+          echo "/usr/games" >> "$GITHUB_PATH"
+
+      - name: Show the Stockfish version
+        run: echo quit | /usr/games/stockfish | head -n 1
+
+      - name: Install dependencies
+        run: uv sync --locked
+
+      - name: Lint
+        run: uv run ruff check .
+
+      - name: Check formatting
+        run: uv run ruff format --check .
+
+      - name: Run tests (a skipped test fails the build)
+        shell: bash
+        run: |
+          uv run pytest -q -rs | tee pytest.log
+          if grep -Eq "[0-9]+ skipped" pytest.log; then
+            echo "Some tests were skipped. Is Stockfish installed?"
+            exit 1
+          fi
