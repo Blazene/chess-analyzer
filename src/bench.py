@@ -45,7 +45,8 @@ def main() -> None:
         baseline = baseline or elapsed
         speed = positions / elapsed
         print(
-            f"{workers:>2} workers: {elapsed:6.1f}s  {speed:5.1f} positions/s  {baseline / elapsed:4.1f}x"
+            f"{workers:>2} workers: {elapsed:6.1f}s  {speed:5.1f} positions/s  "
+            f"{baseline / elapsed:4.1f}x"
         )
 
 
