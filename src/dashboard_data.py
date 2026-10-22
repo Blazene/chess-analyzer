@@ -6,10 +6,12 @@ not need Stockfish at all.
 """
 
 from dataclasses import dataclass
+from datetime import date
 
 import pandas as pd
 import psycopg
 
+from filters import NO_FILTERS, Filters
 from insights import MIN_GAMES, OpeningRecord, PhaseStats, opening_win_rates, phase_accuracy
 from time_insights import (
     GroupStats,
@@ -108,7 +110,7 @@ def latest_run(conn: psycopg.Connection) -> RunInfo | None:
 
 
 def load_dashboard(
-    conn: psycopg.Connection, include_ai: bool = False, min_games: int = MIN_GAMES
+    conn: psycopg.Connection, filters: Filters = NO_FILTERS, min_games: int = MIN_GAMES
 ) -> Dashboard:
     """Run every query the dashboard needs. Results without a run still load."""
     run = latest_run(conn)
@@ -116,13 +118,13 @@ def load_dashboard(
     run_id = run.run_id if run else None
     return Dashboard(
         run=run,
-        openings=opening_win_rates(conn, min_games, include_ai),
-        phases=phase_accuracy(conn, run_id, include_ai=include_ai) if analyzed else [],
-        speeds=speed_results(conn, include_ai),
-        speed_stats=speed_accuracy(conn, run_id, include_ai) if analyzed else [],
-        clock=clock_accuracy(conn, run_id, include_ai=include_ai) if analyzed else [],
-        months=monthly_results(conn, include_ai),
-        month_stats=monthly_accuracy(conn, run_id, include_ai) if analyzed else [],
+        openings=opening_win_rates(conn, filters, min_games),
+        phases=phase_accuracy(conn, run_id, filters) if analyzed else [],
+        speeds=speed_results(conn, filters),
+        speed_stats=speed_accuracy(conn, run_id, filters) if analyzed else [],
+        clock=clock_accuracy(conn, run_id, filters) if analyzed else [],
+        months=monthly_results(conn, filters),
+        month_stats=monthly_accuracy(conn, run_id, filters) if analyzed else [],
     )
 
 
@@ -210,3 +212,32 @@ def phases_frame(stats: list[PhaseStats]) -> pd.DataFrame:
         for s in stats
     ]
     return pd.DataFrame(rows, columns=PHASE_COLUMNS)
+
+
+# ---------- what the sidebar can offer ----------
+
+SPEED_ORDER = ("ultraBullet", "bullet", "blitz", "rapid", "classical", "correspondence")
+
+SPEEDS_SQL = "SELECT DISTINCT speed FROM games"
+DATE_BOUNDS_SQL = (
+    "SELECT min((played_at AT TIME ZONE 'UTC')::date), max((played_at AT TIME ZONE 'UTC')::date) "
+    "FROM games"
+)
+
+
+@dataclass(frozen=True)
+class Options:
+    """The choices the filters can offer: time controls played, and the first and last day."""
+
+    speeds: list[str]
+    first_day: date | None
+    last_day: date | None
+
+
+def load_options(conn: psycopg.Connection) -> Options:
+    """Time controls (shortest first) and the UTC day range of all stored games."""
+    found = [row[0] for row in conn.execute(SPEEDS_SQL).fetchall()]
+    known = len(SPEED_ORDER)
+    speeds = sorted(found, key=lambda s: (SPEED_ORDER.index(s) if s in SPEED_ORDER else known, s))
+    first_day, last_day = conn.execute(DATE_BOUNDS_SQL).fetchone()
+    return Options(speeds, first_day, last_day)

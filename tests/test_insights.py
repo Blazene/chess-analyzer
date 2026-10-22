@@ -2,6 +2,7 @@ import pytest
 from insights_helpers import FEN_SEVEN, FEN_SIX, add_scored_game, mv
 
 from db import get_or_create_run
+from filters import Filters
 from insights import OpeningRecord, opening_win_rates, phase_accuracy
 
 
@@ -94,7 +95,7 @@ def test_games_against_the_computer_are_excluded_unless_asked(db):
     add_scored_game(db, opponent_is_ai=True)
 
     assert opening_win_rates(db, min_games=1)[0].games == 1
-    assert opening_win_rates(db, min_games=1, include_ai=True)[0].games == 2
+    assert opening_win_rates(db, min_games=1, filters=Filters(include_ai=True))[0].games == 2
 
 
 def test_no_games_gives_no_records(db):
@@ -177,7 +178,7 @@ def test_games_against_the_computer_are_left_out_of_phase_stats_unless_asked(db)
     add_scored_game(db, run_id, opponent_is_ai=True, moves=[mv(1, 10)])
 
     assert phase_accuracy(db, run_id) == []
-    assert phase_accuracy(db, run_id, include_ai=True)[0].moves == 1
+    assert phase_accuracy(db, run_id, filters=Filters(include_ai=True))[0].moves == 1
 
 
 def test_another_analysis_run_is_ignored(db):

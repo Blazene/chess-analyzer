@@ -1,4 +1,5 @@
 from contextlib import nullcontext
+from datetime import date
 from pathlib import Path
 
 import psycopg
@@ -7,10 +8,14 @@ import streamlit as st
 from streamlit.testing.v1 import AppTest
 
 import dashboard_data
+from filters import Filters
 from insights import OpeningRecord, PhaseStats
 from time_insights import GroupStats, MonthResult, SpeedRecord
 
 SCRIPT = str(Path(__file__).resolve().parent.parent / "src" / "dashboard.py")
+
+SPEEDS_ONLY = dashboard_data.Options(["blitz", "rapid"], None, None)
+WITH_DATES = dashboard_data.Options(["blitz", "rapid"], date(2024, 1, 1), date(2024, 3, 1))
 
 
 @pytest.fixture(autouse=True)
@@ -45,19 +50,20 @@ def empty() -> dashboard_data.Dashboard:
     )
 
 
-def serve(monkeypatch, dashboard, calls=None):
-    """Make the page read `dashboard` instead of a real database."""
+def serve(monkeypatch, dashboard, options=SPEEDS_ONLY, calls=None):
+    """Make the page read `dashboard` and `options` instead of a real database."""
 
-    def fake_load(conn, include_ai=False, min_games=10):
+    def fake_load(conn, filters=None, min_games=10):
         if calls is not None:
-            calls.append(include_ai)
+            calls.append(filters)
         return dashboard
 
     monkeypatch.setattr("db.connect", lambda url: nullcontext())
     monkeypatch.setattr(dashboard_data, "load_dashboard", fake_load)
+    monkeypatch.setattr(dashboard_data, "load_options", lambda conn: options)
 
 
-def test_the_page_shows_a_title_metrics_and_five_tables(monkeypatch):
+def test_the_page_shows_a_title_metrics_tables_and_charts(monkeypatch):
     serve(monkeypatch, sample())
 
     at = AppTest.from_file(SCRIPT).run()
@@ -67,6 +73,7 @@ def test_the_page_shows_a_title_metrics_and_five_tables(monkeypatch):
     assert len(at.tabs) == 5
     assert len(at.metric) == 4
     assert len(at.dataframe) == 5
+    assert len(at.get("plotly_chart")) == 7
 
 
 def test_the_headline_metrics_show_the_dashboard_numbers(monkeypatch):
@@ -78,7 +85,7 @@ def test_the_headline_metrics_show_the_dashboard_numbers(monkeypatch):
 
 
 def test_without_analysis_the_page_warns_and_shows_no_tables(monkeypatch):
-    serve(monkeypatch, empty())
+    serve(monkeypatch, empty(), dashboard_data.Options([], None, None))
 
     at = AppTest.from_file(SCRIPT).run()
 
@@ -101,11 +108,40 @@ def test_an_unreachable_database_shows_an_error_not_a_crash(monkeypatch):
     assert len(at.metric) == 0
 
 
+def test_no_filters_are_applied_by_default(monkeypatch):
+    calls = []
+    serve(monkeypatch, sample(), WITH_DATES, calls)
+
+    AppTest.from_file(SCRIPT).run()
+
+    assert calls == [Filters()]
+
+
 def test_the_checkbox_reaches_the_loader(monkeypatch):
     calls = []
-    serve(monkeypatch, sample(), calls)
+    serve(monkeypatch, sample(), calls=calls)
 
     at = AppTest.from_file(SCRIPT).run()
     at.sidebar.checkbox[0].check().run()
 
-    assert calls == [False, True]
+    assert [c.include_ai for c in calls] == [False, True]
+
+
+def test_the_color_choice_reaches_the_loader(monkeypatch):
+    calls = []
+    serve(monkeypatch, sample(), calls=calls)
+
+    at = AppTest.from_file(SCRIPT).run()
+    at.sidebar.selectbox[0].select("Black").run()
+
+    assert [c.color for c in calls] == [None, "black"]
+
+
+def test_unselecting_a_time_control_reaches_the_loader(monkeypatch):
+    calls = []
+    serve(monkeypatch, sample(), calls=calls)
+
+    at = AppTest.from_file(SCRIPT).run()
+    at.sidebar.multiselect[0].unselect("rapid").run()
+
+    assert [c.speeds for c in calls] == [None, ("blitz",)]

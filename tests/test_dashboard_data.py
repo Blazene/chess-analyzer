@@ -13,6 +13,7 @@ from dashboard_data import (
     speeds_frame,
 )
 from db import get_or_create_run
+from filters import Filters
 from insights import OpeningRecord, PhaseStats
 from time_insights import GroupStats, MonthResult, SpeedRecord
 
@@ -117,7 +118,7 @@ def test_the_computer_is_excluded_unless_asked(db):
     add_timed_game(db, opponent_is_ai=True)
 
     assert load_dashboard(db).games == 0
-    assert load_dashboard(db, include_ai=True).games == 1
+    assert load_dashboard(db, filters=Filters(include_ai=True)).games == 1
 
 
 def test_the_opening_minimum_is_passed_through(db):

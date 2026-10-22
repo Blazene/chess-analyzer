@@ -2,6 +2,7 @@ import pytest
 from time_helpers import add_timed_game, mv
 
 from db import get_or_create_run
+from filters import Filters
 from time_insights import (
     GroupStats,
     MonthResult,
@@ -71,7 +72,7 @@ def test_games_against_the_computer_are_excluded_from_speed_results_unless_asked
     add_timed_game(db, opponent_is_ai=True)
 
     assert speed_results(db)[0].games == 1
-    assert speed_results(db, include_ai=True)[0].games == 2
+    assert speed_results(db, filters=Filters(include_ai=True))[0].games == 2
 
 
 def test_no_games_gives_no_speed_rows(db):
@@ -171,7 +172,7 @@ def test_clock_stats_can_be_limited_to_one_speed(db):
     add_timed_game(db, run_id, speed="blitz", moves=[mv(1, 500)])
     add_timed_game(db, run_id, speed="rapid", moves=[mv(1, 500), mv(3, 500)])
 
-    assert clock_accuracy(db, run_id, speed="rapid")[0].moves == 2
+    assert clock_accuracy(db, run_id, Filters(speeds=("rapid",)))[0].moves == 2
     assert clock_accuracy(db, run_id)[0].moves == 3
 
 
@@ -194,7 +195,7 @@ def test_clock_stats_exclude_the_computer_unless_asked(db):
     add_timed_game(db, run_id, opponent_is_ai=True, moves=[mv(1, 500)])
 
     assert clock_accuracy(db, run_id) == []
-    assert clock_accuracy(db, run_id, include_ai=True)[0].moves == 1
+    assert clock_accuracy(db, run_id, filters=Filters(include_ai=True))[0].moves == 1
 
 
 # ---------- trends by month ----------
@@ -251,7 +252,7 @@ def test_monthly_results_exclude_the_computer_unless_asked(db):
     add_timed_game(db, opponent_is_ai=True)
 
     assert monthly_results(db) == []
-    assert monthly_results(db, include_ai=True)[0].games == 1
+    assert monthly_results(db, filters=Filters(include_ai=True))[0].games == 1
 
 
 def test_monthly_accuracy_counts_your_moves_by_month(db):
