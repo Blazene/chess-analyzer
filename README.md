@@ -2,6 +2,8 @@
 
 ![CI](https://github.com/Blazene/chess-analyzer/actions/workflows/ci.yml/badge.svg)
 
+**Live demo:** https://chess-analyzer-hk7he9r4rlz4lebdrmgtf3.streamlit.app (free hosting: after a quiet period the first load can take several seconds while the app and database wake up)
+
 Downloads my Lichess games, analyzes every move with Stockfish, stores the results in PostgreSQL, and shows where I lose points (openings, game phase, time pressure) in a Streamlit dashboard.
 
 ![Overview tab](docs/images/overview.png)
@@ -81,6 +83,18 @@ docker run --rm -p 8501:8501 -e DATABASE_URL=postgresql://analyzer:analyzer@host
 
 The dashboard only uses `DATABASE_URL`, but `config.py` insists on all three settings, so the other two get dummy values. That is a known wart.
 
+
+## Deployment
+
+The dashboard runs on Streamlit Community Cloud and reads from a free managed PostgreSQL database on Neon. The analysis still runs on my machine, because the cloud side only serves saved results.
+
+- **Analysis stays local.** Stockfish and the batch run use my local PostgreSQL. A dump of that database was restored into Neon.
+- **Read-only access.** The app connects with a database role that can only read, so a leaked credential could not change any data.
+- **No secrets in Git.** The connection string lives in the host's secrets settings. Tests check that `.env` and Streamlit's secrets file are git-ignored, and that no tracked file contains a Neon hostname.
+- **Docker is a second option.** The `Dockerfile` runs the same dashboard anywhere and CI builds it on every push, but the live site does not use it.
+
+The live data is a snapshot of my local database. There is no automatic sync: showing newly analyzed games means reloading the data into Neon by hand. On free tiers the app and database sleep when idle, so a first visit after a quiet period is slower.
+
 ## How it works
 
 Evaluations are stored in integer centipawns from White's point of view, with a mate score in its own column. Exactly one of the two is set, and a database constraint enforces it. One function decides the sign convention, and tests cover both colours.
@@ -140,6 +154,7 @@ GitHub Actions runs on every push, on Ubuntu with a PostgreSQL 16 service and St
 - **The thresholds and the game-phase rule are my own.** The opening is the first 10 moves by each side. The endgame is 6 or fewer minor and major pieces on the board. This ignores pawn structure. The curve constant behind the win probability is one I recall from Lichess's code and have not verified.
 - **The dashboard caches for 5 minutes.** The sidebar has a button to reload.
 - **Results depend on the engine.** An analysis run is identified by engine name and depth, so a different Stockfish version creates a separate run.
+- **The live site is a snapshot.** New games appear there only after I reload the data into Neon by hand.
 
 ## Project layout
 

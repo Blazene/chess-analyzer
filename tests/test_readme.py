@@ -75,3 +75,11 @@ def test_the_readme_names_each_setting():
     missing = [name for name in sorted(SETTINGS) if name not in README]
 
     assert not missing
+
+
+def test_the_readme_links_to_the_live_app():
+    assert re.search(r"https://[a-z0-9-]+\.streamlit\.app", README)
+
+
+def test_the_readme_describes_the_deployment():
+    assert "## Deployment" in README
