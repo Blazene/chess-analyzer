@@ -7,3 +7,6 @@ __pycache__/
 .DS_Store
 
 .fetch_state.json
+
+# Streamlit secrets (never commit)
+.streamlit/secrets.toml
