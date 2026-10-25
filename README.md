@@ -15,6 +15,12 @@ Downloads my Lichess games, analyzes every move with Stockfish, stores the resul
 3. **Score.** Works out how many centipawns each move cost the player who made it, and labels it ok, inaccuracy, mistake or blunder.
 4. **Show.** A dashboard filtered by colour, time control and date range: opening results, accuracy by game phase, blunders by time left on the clock, and trends by month.
 
+### Dashboard
+
+The frontend uses Lichess-inspired warm dark and light themes, available from Streamlit's app menu. Summary cards and a win/draw/loss breakdown lead into five chart-first tabs; the full data tables are in expandable sections below each chart. Filters apply to every metric and chart, and **Reset filters** restores the full date range. On narrow screens, charts stack and summary cards use a two-column layout.
+
+The public theme lives in `.streamlit/config.toml`; layout refinements are in `src/dashboard.css`. Both ship with the Docker image too. No database or analysis changes are needed for the frontend.
+
 ## The data
 
 Fetched 2,010 games. 1,960 are stored and 50 are skipped (33 from a custom position, 11 Chess960, 6 aborted). The 1,960 stored games hold 115,382 moves and run from October 2022 to October 2026. About 20% of them carry Lichess's own analysis, which I use for a cross-check below.

@@ -1,0 +1,139 @@
+/* Native Streamlit controls stay intact, including keyboard focus and the mobile sidebar. */
+.stApp {
+    /* Streamlit updates color-scheme immediately, without a Python rerun. */
+    --dashboard-surface: light-dark(#ffffff, #262421);
+    --dashboard-accent: light-dark(#527a32, #8ab85b);
+    --dashboard-on-accent: light-dark(#ffffff, #161512);
+    --dashboard-border: light-dark(#dedad4, #38352f);
+    --dashboard-text: light-dark(#45413c, #d6d3ce);
+}
+
+.stMainBlockContainer {
+    max-width: 1440px;
+    padding-left: 2.5rem;
+    padding-right: 2.5rem;
+    container-type: inline-size;
+    container-name: dashboard;
+}
+
+h1 {
+    letter-spacing: -0.045em;
+}
+
+h2, h3 {
+    letter-spacing: -0.02em;
+}
+
+[data-testid="stSidebar"] {
+    border-right: 1px solid var(--dashboard-border);
+}
+
+[data-testid="stSidebar"] h3 {
+    padding-top: 0;
+}
+
+[data-testid="stMetric"] {
+    background: var(--dashboard-surface);
+    border-top: 2px solid var(--dashboard-accent);
+    min-height: 112px;
+}
+
+[data-testid="stMetricValue"] {
+    font-weight: 400;
+    font-variant-numeric: tabular-nums;
+}
+
+[data-testid="stMultiSelectTagsContainer"] [data-tag],
+[data-testid="stMultiSelectTagsContainer"] [data-tag] button {
+    color: var(--dashboard-on-accent);
+}
+
+/* Keep small chart labels as readable as body text in both native themes. */
+.js-plotly-plot .xtick text,
+.js-plotly-plot .ytick text,
+.js-plotly-plot .gtitle,
+.js-plotly-plot .xtitle,
+.js-plotly-plot .ytitle,
+.js-plotly-plot .bartext-outside {
+    fill: var(--dashboard-text) !important;
+}
+
+[data-baseweb="tab-list"] {
+    gap: 1.75rem;
+    margin-top: 0.75rem;
+}
+
+[data-baseweb="tab"] {
+    padding: 0.75rem 0;
+}
+
+[data-testid="stVerticalBlockBorderWrapper"] > div {
+    border-radius: 4px;
+}
+
+.result-bar {
+    display: flex;
+    height: 12px;
+    margin: 0.5rem 0 1.25rem;
+    overflow: hidden;
+    border-radius: 2px;
+}
+
+.result-win { background-color: #81a85d; }
+.result-draw { background-color: #9b968e; }
+.result-loss { background-color: #c37564; }
+
+.result-key {
+    display: grid;
+    grid-template-columns: 10px 1fr auto auto;
+    align-items: center;
+    gap: 0.65rem;
+    padding: 0.45rem 0;
+    font-size: 0.9rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.result-key strong {
+    font-weight: 500;
+}
+
+.result-key .share {
+    min-width: 3.5rem;
+    text-align: right;
+    opacity: 0.75;
+}
+
+.result-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+}
+
+@media (max-width: 850px) {
+    .stMainBlockContainer {
+        padding-left: 1rem;
+        padding-right: 1rem;
+    }
+}
+
+/* Respond to the actual content width, even with an expanded sidebar. */
+@container dashboard (max-width: 760px) {
+    [data-testid="stHorizontalBlock"] {
+        flex-wrap: wrap;
+    }
+
+    [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] {
+        flex: 1 1 100%;
+        min-width: 0;
+    }
+
+    /* Keep the four headline numbers in a compact two-by-two grid. */
+    .st-key-headline-metrics [data-testid="stColumn"] {
+        flex: 1 1 calc(50% - 1rem);
+        min-width: 0;
+    }
+
+    [data-baseweb="tab-list"] {
+        gap: 1.25rem;
+    }
+}

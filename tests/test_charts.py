@@ -1,6 +1,7 @@
 import pandas as pd
+import pytest
 
-from charts import bar_chart, fill_missing_months, line_chart, openings_chart
+from charts import PALETTES, bar_chart, fill_missing_months, line_chart, openings_chart
 
 
 def months(*rows):
@@ -142,3 +143,39 @@ def test_the_openings_chart_has_a_fifty_percent_reference_line():
 
     assert len(fig.layout.shapes) == 1
     assert fig.layout.shapes[0].x0 == 50
+
+
+@pytest.mark.parametrize("theme", ["dark", "light"])
+def test_all_charts_follow_the_selected_theme_without_an_opaque_background(theme):
+    frame = pd.DataFrame({"Phase": ["opening"], "Blunder %": [4.5]})
+    figures = [
+        bar_chart(frame, "Phase", "Blunder %", "T", "Y", theme=theme),
+        line_chart(gap_frame(), "Score %", "T", "Y", theme=theme),
+        openings_chart(openings(3), theme=theme),
+    ]
+
+    for fig in figures:
+        assert fig.layout.font.color == PALETTES[theme]["text"]
+        assert fig.layout.paper_bgcolor == "rgba(0,0,0,0)"
+        assert fig.layout.plot_bgcolor == "rgba(0,0,0,0)"
+
+
+def test_the_score_bar_axis_runs_from_zero_to_one_hundred():
+    frame = pd.DataFrame({"Speed": ["blitz"], "Score %": [55.0]})
+
+    fig = bar_chart(frame, "Speed", "Score %", "Score", "score %")
+
+    assert list(fig.layout.yaxis.range) == [0, 100]
+    assert fig.layout.yaxis.ticksuffix == "%"
+
+
+def test_long_opening_labels_wrap_without_changing_the_underlying_data():
+    frame = openings(1)
+    name = "Queen's Gambit Declined & Semi-Slav Defense with a very long opening name"
+    frame.loc[0, "Opening"] = name
+
+    fig = openings_chart(frame)
+
+    assert list(fig.data[0].y) == [f"{name} (white)"]
+    assert "<br>" in fig.layout.yaxis.ticktext[0]
+    assert "&amp;" in fig.layout.yaxis.ticktext[0]

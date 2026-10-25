@@ -1,4 +1,6 @@
+import json
 from contextlib import nullcontext
+from dataclasses import replace
 from datetime import date
 from pathlib import Path
 
@@ -145,3 +147,129 @@ def test_unselecting_a_time_control_reaches_the_loader(monkeypatch):
     at.sidebar.multiselect[0].unselect("rapid").run()
 
     assert [c.speeds for c in calls] == [None, ("blitz",)]
+
+
+def test_the_result_summary_uses_the_same_games_as_the_headline_metrics(monkeypatch):
+    serve(monkeypatch, sample())
+
+    at = AppTest.from_file(SCRIPT).run()
+    html = "\n".join(node.proto.body for node in at.get("html"))
+
+    assert 'aria-label="6 wins, 0 draws, 4 losses"' in html
+    assert '<span class="share">60%</span>' in html
+    assert '<span class="share">0%</span>' in html
+    assert '<span class="share">40%</span>' in html
+
+
+def test_the_highest_loss_phase_is_derived_from_the_filtered_analysis(monkeypatch):
+    dashboard = replace(
+        sample(),
+        phases=[PhaseStats("opening", 100, 5000, 5), PhaseStats("endgame", 20, 3000, 3)],
+    )
+    serve(monkeypatch, dashboard)
+
+    at = AppTest.from_file(SCRIPT).run()
+
+    assert "**Highest average loss: Endgame**" in [item.value for item in at.markdown]
+    assert "150 cp per move · 20 analyzed moves" in [item.value for item in at.caption]
+
+
+def test_reset_filters_restores_every_default_including_the_date_range(monkeypatch):
+    serve(monkeypatch, sample(), WITH_DATES)
+    at = AppTest.from_file(SCRIPT).run()
+    at.sidebar.selectbox[0].select("Black")
+    at.sidebar.multiselect[0].unselect("rapid")
+    at.sidebar.checkbox[0].check()
+    at.sidebar.date_input[0].set_value((date(2024, 2, 1), date(2024, 2, 20)))
+    at.run()
+
+    next(button for button in at.sidebar.button if button.label == "Reset filters").click().run()
+
+    assert not at.exception
+    assert at.sidebar.selectbox[0].value == "Both"
+    assert at.sidebar.multiselect[0].value == ["blitz", "rapid"]
+    assert at.sidebar.checkbox[0].value is False
+    assert at.sidebar.date_input[0].value == (WITH_DATES.first_day, WITH_DATES.last_day)
+
+
+def test_reset_filters_also_works_without_dates(monkeypatch):
+    serve(monkeypatch, sample())
+    at = AppTest.from_file(SCRIPT).run()
+    at.sidebar.selectbox[0].select("White").run()
+
+    next(button for button in at.sidebar.button if button.label == "Reset filters").click().run()
+
+    assert not at.exception
+    assert at.sidebar.selectbox[0].value == "Both"
+
+
+def test_active_filters_are_visible_above_the_metrics(monkeypatch):
+    serve(monkeypatch, sample(), WITH_DATES)
+    at = AppTest.from_file(SCRIPT).run()
+    at.sidebar.selectbox[0].select("Black")
+    at.sidebar.multiselect[0].unselect("rapid")
+    at.sidebar.checkbox[0].check()
+    at.sidebar.date_input[0].set_value((date(2024, 2, 1), date(2024, 2, 20)))
+    at.run()
+
+    assert "Playing black · Blitz · 01 Feb 2024 – 20 Feb 2024 · Including computer games" in [
+        item.value for item in at.caption
+    ]
+
+
+def test_no_matching_games_has_a_recoverable_empty_state(monkeypatch):
+    serve(monkeypatch, replace(empty(), run=sample().run))
+
+    at = AppTest.from_file(SCRIPT).run()
+
+    assert not at.exception
+    assert any("Reset filters" in item.value for item in at.info)
+    assert not at.get("plotly_chart")
+    assert [m.value for m in at.metric] == ["0", "-", "-", "-"]
+
+
+def test_games_without_analysis_still_show_results_and_trends(monkeypatch):
+    dashboard = replace(sample(), run=None, phases=[], speed_stats=[], clock=[], month_stats=[])
+    serve(monkeypatch, dashboard)
+
+    at = AppTest.from_file(SCRIPT).run()
+
+    assert not at.exception
+    assert [m.value for m in at.metric] == ["10", "60.0%", "-", "-"]
+    assert len(at.get("plotly_chart")) == 5
+    assert not any("Highest average loss" in item.value for item in at.markdown)
+
+
+def test_clearing_all_time_controls_does_not_mean_all_time_controls(monkeypatch):
+    calls = []
+    serve(monkeypatch, sample(), calls=calls)
+    at = AppTest.from_file(SCRIPT).run()
+
+    at.sidebar.multiselect[0].set_value([]).run()
+
+    assert not at.exception
+    assert calls[-1].speeds == ()
+    assert any("No time controls" in item.value for item in at.caption)
+
+
+def test_reload_discards_the_cached_dashboard_and_options(monkeypatch):
+    calls = []
+    serve(monkeypatch, sample(), calls=calls)
+    at = AppTest.from_file(SCRIPT).run()
+
+    next(button for button in at.sidebar.button if button.label == "Reload data").click().run()
+
+    assert not at.exception
+    assert calls == [Filters(), Filters()]
+
+
+def test_charts_follow_native_theme_changes_without_needing_a_python_rerun(monkeypatch):
+    serve(monkeypatch, sample())
+
+    at = AppTest.from_file(SCRIPT).run()
+
+    for node in at.get("plotly_chart"):
+        assert node.proto.theme == "streamlit"
+        layout = json.loads(node.proto.spec)["layout"]
+        assert "color" not in layout["font"]
+        assert "gridcolor" not in layout["yaxis"]

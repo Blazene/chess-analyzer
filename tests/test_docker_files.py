@@ -23,6 +23,17 @@ def test_the_env_file_never_enters_the_build_context():
     assert ".env" in ignored_paths()
 
 
+def test_streamlit_secrets_never_enter_the_build_context():
+    assert ".streamlit/secrets.toml" in ignored_paths()
+
+
+def test_the_image_copies_only_the_public_streamlit_theme():
+    copies = [line.split() for line in instructions() if line.startswith("COPY ")]
+
+    assert ["COPY", ".streamlit/config.toml", "./.streamlit/config.toml"] in copies
+    assert not any(".streamlit" in tokens[1:-1] for tokens in copies)
+
+
 def test_git_history_and_the_virtualenv_stay_out_of_the_build_context():
     assert {".git", ".venv"} <= set(ignored_paths())
 
